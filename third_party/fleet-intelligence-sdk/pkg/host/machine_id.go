@@ -14,23 +14,8 @@ import (
 	"strings"
 
 	"github.com/NVIDIA/fleet-intelligence-sdk/pkg/file"
-	"github.com/NVIDIA/fleet-intelligence-sdk/pkg/log"
 	"github.com/google/uuid"
 )
-
-// Returns the UUID of the machine host.
-// Returns an empty string if the UUID is not found.
-func GetMachineID(ctx context.Context) (string, error) {
-	// hw-based UUID first
-	uuid, err := GetDmidecodeUUID(ctx)
-	if err != nil {
-		log.Logger.Warnw("failed to get UUID from dmidecode, trying to read from file", "error", err)
-
-		// otherwise, try to read from file
-		return GetOSMachineID()
-	}
-	return uuid, nil
-}
 
 // Fetches the UUIF of the machine host, using the "dmidecode".
 // Returns an empty string if the UUID is not found.
@@ -90,14 +75,17 @@ func validateDmidecodeUUID(id string) error {
 	return nil
 }
 
+// machineIDPaths are the systemd and legacy D-Bus locations of the same OS
+// machine ID.
 // ref. https://github.com/google/cadvisor/blob/854445c010e0b634fcd855a20681ae986da235df/machine/info.go#L39
 var machineIDPaths = []string{
 	"/etc/machine-id",
 	"/var/lib/dbus/machine-id",
 }
 
-// GetOSMachineID returns the OS-level UUID based on /etc/machine-id or /var/lib/dbus/machine-id.
-// Returns an empty string if the UUID is not found.
+// GetOSMachineID returns the OS machine ID as reported, from /etc/machine-id or
+// its legacy D-Bus location /var/lib/dbus/machine-id. It returns an empty
+// string when neither exists and never substitutes another identifier.
 func GetOSMachineID() (string, error) {
 	return getOSMachineID(machineIDPaths)
 }
@@ -154,24 +142,26 @@ func getOSName(file string) (string, error) {
 	return name, nil
 }
 
-const (
-	dmiDir       = "/sys/class/dmi"
-	ppcDevTree   = "/proc/device-tree"
-	s390xDevTree = "/etc" // s390/s390x changes
-)
+const dmiDir = "/sys/class/dmi"
 
-// GetSystemUUID returns the system UUID of the machine.
-// ref. https://github.com/google/cadvisor/blob/master/utils/sysfs/sysfs.go#L442
+// GetSystemUUID returns the DMI product UUID of the machine as reported.
+// It returns an empty string and an error when the UUID is missing or is not a
+// standard 36-character UUID. It never falls back to another identifier such as
+// /etc/machine-id, because the backend uses this value as hardware identity
+// evidence. Placeholder values are reported unchanged; consumers that need a
+// usable identity must reject them.
 func GetSystemUUID() (string, error) {
-	if id, err := os.ReadFile(path.Join(dmiDir, "id", "product_uuid")); err == nil {
-		return strings.TrimSpace(string(id)), nil
-	} else if id, err = os.ReadFile(path.Join(ppcDevTree, "system-id")); err == nil {
-		return strings.TrimSpace(strings.TrimRight(string(id), "\000")), nil
-	} else if id, err = os.ReadFile(path.Join(ppcDevTree, "vm,uuid")); err == nil {
-		return strings.TrimSpace(strings.TrimRight(string(id), "\000")), nil
-	} else if id, err = os.ReadFile(path.Join(s390xDevTree, "machine-id")); err == nil {
-		return strings.TrimSpace(string(id)), nil
-	} else {
+	return getSystemUUID(path.Join(dmiDir, "id", "product_uuid"))
+}
+
+func getSystemUUID(productUUIDPath string) (string, error) {
+	content, err := os.ReadFile(productUUIDPath)
+	if err != nil {
 		return "", err
 	}
+	id := strings.TrimSpace(string(content))
+	if _, err := uuid.Parse(id); err != nil || len(id) != 36 {
+		return "", fmt.Errorf("invalid DMI product UUID %q", id)
+	}
+	return id, nil
 }
