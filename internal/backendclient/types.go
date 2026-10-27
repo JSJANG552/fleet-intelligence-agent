@@ -30,19 +30,19 @@ type NodeUpsertRequest struct {
 	KernelVersion           string        `json:"kernelVersion"`
 	OSImage                 string        `json:"osImage"`
 	OperatingSystem         string        `json:"operatingSystem"`
-	SystemUUID              string        `json:"systemUUID"`
-	MachineID               string        `json:"machineId"`
+	SystemUUID              string        `json:"systemUUID,omitempty"`
 	BootID                  string        `json:"bootID"`
 	Uptime                  *time.Time    `json:"uptime,omitempty"`
 	EnrolledAt              *time.Time    `json:"enrolledAt,omitempty"`
 	NetPrivateIP            string        `json:"netPrivateIP,omitempty"`
 	NodeGroup               string        `json:"nodeGroup"`
 	ComputeZone             string        `json:"computeZone"`
+	// Deprecated: OS machine ID, not the agent UUID or hardware system UUID.
+	MachineID string `json:"machineId"`
 }
 
 // NodeUpsertResponse is the backend-resolved node membership after inventory upsert.
 type NodeUpsertResponse struct {
-	NodeUUID    string `json:"nodeUUID"`
 	ComputeZone string `json:"computeZone"`
 	NodeGroup   string `json:"nodeGroup"`
 }
