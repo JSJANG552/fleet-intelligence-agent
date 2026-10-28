@@ -34,7 +34,7 @@ func TestValidateNodeUpsertRequest(t *testing.T) {
 	now := time.Now().UTC()
 	req := &backendclient.NodeUpsertRequest{
 		Hostname:   "",
-		MachineID:  "machine-1",
+		MachineID:  "machine-1", //nolint:staticcheck // Exercise validation of the legacy OS machine ID payload.
 		SystemUUID: "not-a-uuid",
 		Uptime:     &now,
 		AgentConfig: backendclient.AgentConfig{
@@ -81,11 +81,25 @@ func TestValidateNodeUpsertRequest(t *testing.T) {
 	})
 }
 
+func TestValidateNodeUpsertRequest_MissingSystemUUIDIsWarning(t *testing.T) {
+	req := &backendclient.NodeUpsertRequest{
+		Hostname:  "host",
+		MachineID: "machine-1", //nolint:staticcheck // Exercise the legacy payload with missing hardware identity.
+	}
+
+	require.Contains(t, ValidateNodeUpsertRequest(req), Issue{
+		Severity: SeverityWarning,
+		Category: "identity",
+		Field:    "systemUUID",
+		Message:  "field is required",
+	})
+}
+
 func TestValidateNodeUpsertRequest_GPUUUID(t *testing.T) {
 	t.Run("accepts NVIDIA GPU UUID format", func(t *testing.T) {
 		req := &backendclient.NodeUpsertRequest{
 			Hostname:   "host",
-			MachineID:  "machine-1",
+			MachineID:  "machine-1", //nolint:staticcheck // Keep a valid legacy payload while checking GPU identity.
 			SystemUUID: "4c4c4544-004a-3410-804c-c7c04f313434",
 			Resources: backendclient.NodeResources{
 				GPUInfo: backendclient.GPUInfo{
@@ -105,7 +119,7 @@ func TestValidateNodeUpsertRequest_GPUUUID(t *testing.T) {
 	t.Run("rejects malformed GPU UUID", func(t *testing.T) {
 		req := &backendclient.NodeUpsertRequest{
 			Hostname:   "host",
-			MachineID:  "machine-1",
+			MachineID:  "machine-1", //nolint:staticcheck // Keep a valid legacy payload while checking GPU identity.
 			SystemUUID: "4c4c4544-004a-3410-804c-c7c04f313434",
 			Resources: backendclient.NodeResources{
 				GPUInfo: backendclient.GPUInfo{

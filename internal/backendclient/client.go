@@ -41,9 +41,9 @@ var errNilBaseURL = errors.New("backend base URL is required")
 // Client is the backend workflow client used by enrollment, inventory, and attestation paths.
 type Client interface {
 	Enroll(ctx context.Context, sakToken string) (jwt string, err error)
-	UpsertNode(ctx context.Context, nodeUUID string, req *NodeUpsertRequest, jwt string) (*NodeUpsertResponse, error)
-	GetNonce(ctx context.Context, nodeUUID string, jwt string) (*NonceResponse, error)
-	SubmitAttestation(ctx context.Context, nodeUUID string, req *AttestationRequest, jwt string) error
+	UpsertNode(ctx context.Context, agentUUID string, req *NodeUpsertRequest, jwt string) (*NodeUpsertResponse, error)
+	GetNonce(ctx context.Context, agentUUID string, jwt string) (*NonceResponse, error)
+	SubmitAttestation(ctx context.Context, agentUUID string, req *AttestationRequest, jwt string) error
 }
 
 type client struct {
@@ -94,9 +94,9 @@ func (c *client) Enroll(ctx context.Context, sakToken string) (string, error) {
 	return resp.JWTAssertion, nil
 }
 
-func (c *client) UpsertNode(ctx context.Context, nodeUUID string, req *NodeUpsertRequest, jwt string) (*NodeUpsertResponse, error) {
-	if nodeUUID == "" {
-		return nil, fmt.Errorf("nodeUUID cannot be empty")
+func (c *client) UpsertNode(ctx context.Context, agentUUID string, req *NodeUpsertRequest, jwt string) (*NodeUpsertResponse, error) {
+	if agentUUID == "" {
+		return nil, fmt.Errorf("agentUUID cannot be empty")
 	}
 	if jwt == "" {
 		return nil, fmt.Errorf("jwt cannot be empty")
@@ -105,18 +105,11 @@ func (c *client) UpsertNode(ctx context.Context, nodeUUID string, req *NodeUpser
 		return nil, fmt.Errorf("node upsert request cannot be nil")
 	}
 	var wireResp struct {
-		NodeUUID    string  `json:"nodeUUID"`
 		ComputeZone *string `json:"computeZone"`
 		NodeGroup   *string `json:"nodeGroup"`
 	}
-	if err := c.doJSON(ctx, http.MethodPut, []string{"v1", "agent", "nodes", nodeUUID}, jwt, req, &wireResp); err != nil {
+	if err := c.doJSON(ctx, http.MethodPut, []string{"v1", "agent", "nodes", agentUUID}, jwt, req, &wireResp); err != nil {
 		return nil, err
-	}
-	if wireResp.NodeUUID == "" {
-		return nil, fmt.Errorf("node upsert response missing nodeUUID field")
-	}
-	if wireResp.NodeUUID != nodeUUID {
-		return nil, fmt.Errorf("node upsert response nodeUUID %q does not match requested nodeUUID %q", wireResp.NodeUUID, nodeUUID)
 	}
 	if wireResp.NodeGroup == nil {
 		return nil, fmt.Errorf("node upsert response missing nodeGroup field")
@@ -125,22 +118,21 @@ func (c *client) UpsertNode(ctx context.Context, nodeUUID string, req *NodeUpser
 		return nil, fmt.Errorf("node upsert response missing computeZone field")
 	}
 	return &NodeUpsertResponse{
-		NodeUUID:    wireResp.NodeUUID,
 		NodeGroup:   *wireResp.NodeGroup,
 		ComputeZone: *wireResp.ComputeZone,
 	}, nil
 }
 
-func (c *client) GetNonce(ctx context.Context, nodeUUID string, jwt string) (*NonceResponse, error) {
-	if nodeUUID == "" {
-		return nil, fmt.Errorf("nodeUUID cannot be empty")
+func (c *client) GetNonce(ctx context.Context, agentUUID string, jwt string) (*NonceResponse, error) {
+	if agentUUID == "" {
+		return nil, fmt.Errorf("agentUUID cannot be empty")
 	}
 	if jwt == "" {
 		return nil, fmt.Errorf("jwt cannot be empty")
 	}
 
 	var resp NonceResponse
-	if err := c.doJSON(ctx, http.MethodPost, []string{"v1", "agent", "nodes", nodeUUID, "nonce"}, jwt, nil, &resp); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, []string{"v1", "agent", "nodes", agentUUID, "nonce"}, jwt, nil, &resp); err != nil {
 		return nil, err
 	}
 	if resp.Nonce == "" {
@@ -149,9 +141,9 @@ func (c *client) GetNonce(ctx context.Context, nodeUUID string, jwt string) (*No
 	return &resp, nil
 }
 
-func (c *client) SubmitAttestation(ctx context.Context, nodeUUID string, req *AttestationRequest, jwt string) error {
-	if nodeUUID == "" {
-		return fmt.Errorf("nodeUUID cannot be empty")
+func (c *client) SubmitAttestation(ctx context.Context, agentUUID string, req *AttestationRequest, jwt string) error {
+	if agentUUID == "" {
+		return fmt.Errorf("agentUUID cannot be empty")
 	}
 	if jwt == "" {
 		return fmt.Errorf("jwt cannot be empty")
@@ -159,7 +151,7 @@ func (c *client) SubmitAttestation(ctx context.Context, nodeUUID string, req *At
 	if req == nil {
 		return fmt.Errorf("attestation request cannot be nil")
 	}
-	return c.doJSON(ctx, http.MethodPost, []string{"v1", "agent", "nodes", nodeUUID, "attestation"}, jwt, req, nil)
+	return c.doJSON(ctx, http.MethodPost, []string{"v1", "agent", "nodes", agentUUID, "attestation"}, jwt, req, nil)
 }
 
 func (c *client) doJSON(ctx context.Context, method string, pathElems []string, bearerToken string, reqBody any, respBody any) error {

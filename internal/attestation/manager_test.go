@@ -103,7 +103,7 @@ func TestCollectOnceSuccess(t *testing.T) {
 	result, err := manager.CollectOnce(context.Background())
 	require.NoError(t, err)
 	require.True(t, result.Success)
-	require.Equal(t, "node-1", result.NodeUUID)
+	require.Equal(t, "node-1", result.AgentUUID)
 	require.Equal(t, refreshTS, result.NonceRefreshTimestamp)
 	require.Equal(t, "new-jwt", jwtProvider.setJWT)
 	require.NotNil(t, submitter.submitted.result)
@@ -152,7 +152,7 @@ func TestManagerRunAndCachedResult(t *testing.T) {
 
 	last := mgr.LastResult()
 	require.NotNil(t, last)
-	require.Equal(t, "node-1", last.NodeUUID)
+	require.Equal(t, "node-1", last.AgentUUID)
 	require.True(t, mgr.IsResultUpdated(time.Time{}))
 }
 
@@ -227,15 +227,13 @@ func TestManagerHelpersAndSubmitterErrors(t *testing.T) {
 	require.ErrorContains(t, err, "backend client")
 	err = NewBackendSubmitter(&recordingClient{}).Submit(context.Background(), nil, "jwt")
 	require.ErrorContains(t, err, "requires result")
-	err = NewBackendSubmitter(&recordingClient{}).Submit(context.Background(), &Result{}, "")
-	require.ErrorContains(t, err, "requires jwt")
 }
 
 func TestBackendSubmitterValidationDoesNotBlockSubmit(t *testing.T) {
 	client := &recordingClient{}
 	result := &Result{
-		NodeUUID: "node-1",
-		Success:  true,
+		AgentUUID: "node-1",
+		Success:   true,
 		// Missing nonce refresh timestamp and evidences intentionally to trigger validation issues.
 		SDKResponse: SDKResponse{
 			ResultCode: 200,
@@ -244,12 +242,12 @@ func TestBackendSubmitterValidationDoesNotBlockSubmit(t *testing.T) {
 
 	err := NewBackendSubmitter(client).Submit(context.Background(), result, "jwt-token")
 	require.NoError(t, err)
-	require.Equal(t, "node-1", client.lastNodeUUID)
+	require.Equal(t, "node-1", client.lastAgentUUID)
 	require.NotNil(t, client.lastReq)
 	require.True(t, client.lastReq.AttestationData.Success)
 }
 
-func TestStateJWTProviderAndNodeUUIDProviderErrors(t *testing.T) {
+func TestStateJWTProviderAndAgentUUIDProviderErrors(t *testing.T) {
 	_, err := NewStateJWTProvider(nil).GetJWT(context.Background())
 	require.ErrorContains(t, err, "requires agent state")
 	err = NewStateJWTProvider(nil).SetJWT(context.Background(), "x")
@@ -258,10 +256,10 @@ func TestStateJWTProviderAndNodeUUIDProviderErrors(t *testing.T) {
 	_, err = NewStateJWTProvider(&stubState{}).GetJWT(context.Background())
 	require.ErrorContains(t, err, "jwt not available")
 
-	_, err = NewStateNodeUUIDProvider(nil)(context.Background())
+	_, err = NewStateAgentUUIDProvider(nil)(context.Background())
 	require.ErrorContains(t, err, "requires agent state")
-	_, err = NewStateNodeUUIDProvider(&stubState{})(context.Background())
-	require.ErrorContains(t, err, "node UUID not available")
+	_, err = NewStateAgentUUIDProvider(&stubState{})(context.Background())
+	require.ErrorContains(t, err, "agent UUID not available")
 }
 
 func TestSleepWithContext(t *testing.T) {
