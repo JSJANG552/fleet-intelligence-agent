@@ -48,7 +48,7 @@ Common values (defaults from `values.yaml`):
 | `env.HTTP_PROXY` | `""` | Optional HTTP proxy for outbound requests. |
 | `env.HTTPS_PROXY` | `""` | Optional HTTPS proxy for outbound requests. |
 | `logLevel` | `warn` | Log level. |
-| `listenAddress` | `0.0.0.0:15133` | Listen address. |
+| `listenAddress` | `127.0.0.1:15133` | Listen address. |
 | `retentionPeriod` | `24h` | Retention period for stored metrics and events. |
 | `components` | `all` | Enabled components. |
 | `enableFaultInjection` | `false` | Enable the localhost-only fault injection endpoint for testing; does not inject faults automatically. |
